@@ -9,12 +9,7 @@
     "allowMixedContent": true,
     "captureInput": true,
     "webContentsDebuggingEnabled": false,
-    "backgroundColor": "#000000",
+    "backgroundColor": "#0a0a0f",
     "loggingBehavior": "none"
-  },
-  "plugins": {
-    "CapacitorHttp": {
-      "enabled": false
-    }
   }
 }

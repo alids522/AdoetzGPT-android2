@@ -4,17 +4,8 @@
   "description": "AdoetzGPT Flash - Android wrapper for Open WebUI",
   "private": true,
   "scripts": {
-    "build:frontend": "npm run build --prefix frontend",
-    "cap:sync": "npx cap sync android",
-    "cap:open": "npx cap open android",
-    "build:android": "npm run build:frontend && npm run cap:sync",
-    "postinstall": "npm install --prefix frontend"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.2.0"
-  },
-  "dependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/core": "^6.2.0"
+    "build:frontend": "cd frontend && npm run build",
+    "copy:assets": "mkdir -p android/app/src/main/assets/public && cp -r frontend/build/. android/app/src/main/assets/public/",
+    "build:android": "npm run build:frontend && npm run copy:assets"
   }
 }

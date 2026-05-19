@@ -3,13 +3,8 @@ name: Build AdoetzGPT Flash APK
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'AdoetzGPT Flash/**'
-      - '.github/workflows/build-flash.yml'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'AdoetzGPT Flash/**'
   workflow_dispatch:
     inputs:
       build_type:
@@ -21,170 +16,116 @@ on:
           - debug
           - release
 
-defaults:
-  run:
-    working-directory: 'AdoetzGPT Flash'
-
 jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      # ─────────────────────────────────────────
-      # 1. Checkout
-      # ─────────────────────────────────────────
+      # ── 1. Checkout ────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ─────────────────────────────────────────
-      # 2. Set up Node.js
-      # ─────────────────────────────────────────
+      # ── 2. Set up Node.js ──────────────────────
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'AdoetzGPT Flash/package.json'
 
-      # ─────────────────────────────────────────
-      # 3. Set up JDK 17
-      # ─────────────────────────────────────────
+      # ── 3. Set up JDK 17 ──────────────────────
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # ─────────────────────────────────────────
-      # 4. Cache Gradle
-      # ─────────────────────────────────────────
+      # ── 4. Cache Gradle ────────────────────────
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('AdoetzGPT Flash/android/**/*.gradle*', 'AdoetzGPT Flash/android/**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # ─────────────────────────────────────────
-      # 5. Install root Node dependencies
-      # ─────────────────────────────────────────
-      - name: Install root dependencies
-        run: npm install
-
-      # ─────────────────────────────────────────
-      # 6. Install frontend dependencies
-      # ─────────────────────────────────────────
+      # ── 5. Install frontend dependencies ───────
       - name: Install frontend dependencies
         run: npm install
-        working-directory: 'AdoetzGPT Flash/frontend'
+        working-directory: frontend
 
-      # ─────────────────────────────────────────
-      # 7. Build frontend
-      # ─────────────────────────────────────────
+      # ── 6. Build frontend (SvelteKit static) ───
       - name: Build frontend
         run: npm run build
-        working-directory: 'AdoetzGPT Flash/frontend'
+        working-directory: frontend
         env:
           NODE_ENV: production
 
-      # ─────────────────────────────────────────
-      # 8. Copy frontend build to Android assets
-      # ─────────────────────────────────────────
+      # ── 7. Copy frontend build to Android assets ─
       - name: Copy frontend to Android assets
         run: |
           mkdir -p android/app/src/main/assets/public
           cp -r frontend/build/. android/app/src/main/assets/public/
           echo "Frontend files copied:"
-          ls android/app/src/main/assets/public/
-        working-directory: 'AdoetzGPT Flash'
+          ls -la android/app/src/main/assets/public/ | head -20
 
-      # ─────────────────────────────────────────
-      # 9. Make gradlew executable
-      # ─────────────────────────────────────────
+      # ── 8. Make gradlew executable ─────────────
       - name: Make gradlew executable
         run: chmod +x gradlew
-        working-directory: 'AdoetzGPT Flash/android'
+        working-directory: android
 
-      # ─────────────────────────────────────────
-      # 10. Set up Android SDK
-      # ─────────────────────────────────────────
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      # ─────────────────────────────────────────
-      # 11. Build Debug APK
-      # ─────────────────────────────────────────
+      # ── 9. Build Debug APK ─────────────────────
       - name: Build Debug APK
-        if: github.event.inputs.build_type != 'release'
+        if: ${{ github.event.inputs.build_type != 'release' }}
         run: ./gradlew assembleDebug --stacktrace --no-daemon
-        working-directory: 'AdoetzGPT Flash/android'
+        working-directory: android
 
-      # ─────────────────────────────────────────
-      # 12. Build Release APK (unsigned unless keystore provided)
-      # ─────────────────────────────────────────
+      # ── 10. Build Release APK ──────────────────
       - name: Set up Release Keystore
-        if: github.event.inputs.build_type == 'release'
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        if: ${{ github.event.inputs.build_type == 'release' }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > android/keystore.jks
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
             cat > android/keystore.properties << EOF
-            storeFile=keystore.jks
-            storePassword=$KEYSTORE_PASSWORD
-            keyAlias=$KEY_ALIAS
-            keyPassword=$KEY_PASSWORD
-            EOF
-            echo "✅ Keystore configured successfully."
-          else
-            echo "⚠️ No keystore provided, building unsigned release APK."
+          storeFile=keystore.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
           fi
-        working-directory: 'AdoetzGPT Flash'
 
       - name: Build Release APK
-        if: github.event.inputs.build_type == 'release'
+        if: ${{ github.event.inputs.build_type == 'release' }}
         run: ./gradlew assembleRelease --stacktrace --no-daemon
-        working-directory: 'AdoetzGPT Flash/android'
+        working-directory: android
 
-      # ─────────────────────────────────────────
-      # 13. Get APK info
-      # ─────────────────────────────────────────
+      # ── 11. Get APK info ───────────────────────
       - name: Get APK info (Debug)
-        if: github.event.inputs.build_type != 'release'
+        if: ${{ github.event.inputs.build_type != 'release' }}
         run: |
-          APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -1)
           APK_NAME=$(basename "$APK_PATH")
           APK_SIZE=$(du -sh "$APK_PATH" | cut -f1)
-          echo "APK_PATH=AdoetzGPT Flash/android/$APK_PATH" >> $GITHUB_ENV
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
           echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
           echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
           echo "✅ Debug APK: $APK_NAME ($APK_SIZE)"
-        working-directory: 'AdoetzGPT Flash/android'
 
       - name: Get APK info (Release)
-        if: github.event.inputs.build_type == 'release'
+        if: ${{ github.event.inputs.build_type == 'release' }}
         run: |
-          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
           APK_NAME=$(basename "$APK_PATH")
           APK_SIZE=$(du -sh "$APK_PATH" | cut -f1)
-          echo "APK_PATH=AdoetzGPT Flash/android/$APK_PATH" >> $GITHUB_ENV
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
           echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
           echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
           echo "✅ Release APK: $APK_NAME ($APK_SIZE)"
-        working-directory: 'AdoetzGPT Flash/android'
 
-      # ─────────────────────────────────────────
-      # 14. Upload APK artifact
-      # ─────────────────────────────────────────
+      # ── 12. Upload APK ────────────────────────
       - name: Upload Debug APK
-        if: github.event.inputs.build_type != 'release'
+        if: ${{ github.event.inputs.build_type != 'release' }}
         uses: actions/upload-artifact@v4
         with:
           name: AdoetzGPT-Flash-debug-${{ github.run_number }}
@@ -192,44 +133,14 @@ jobs:
           retention-days: 30
 
       - name: Upload Release APK
-        if: github.event.inputs.build_type == 'release'
+        if: ${{ github.event.inputs.build_type == 'release' }}
         uses: actions/upload-artifact@v4
         with:
           name: AdoetzGPT-Flash-release-${{ github.run_number }}
           path: ${{ env.APK_PATH }}
           retention-days: 90
 
-      # ─────────────────────────────────────────
-      # 15. GitHub Release (release builds on main)
-      # ─────────────────────────────────────────
-      - name: Create GitHub Release
-        if: github.event.inputs.build_type == 'release' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: flash-v1.0.${{ github.run_number }}
-          name: "AdoetzGPT Flash v1.0.${{ github.run_number }}"
-          body: |
-            ## AdoetzGPT Flash — v1.0.${{ github.run_number }}
-
-            ### What's included
-            - Open WebUI Android client with backend URL setup
-            - Background voice/microphone support via foreground service
-            - Safe-area inset handling for all Android screen sizes
-            - File upload/download support
-
-            ### APK
-            - **File**: ${{ env.APK_NAME }}
-            - **Size**: ${{ env.APK_SIZE }}
-            - **Commit**: ${{ github.sha }}
-          files: ${{ env.APK_PATH }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ─────────────────────────────────────────
-      # 16. Build Summary
-      # ─────────────────────────────────────────
+      # ── 13. Build Summary ──────────────────────
       - name: Build Summary
         if: always()
         run: |
@@ -237,9 +148,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| APK Name | ${{ env.APK_NAME }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| APK Size | ${{ env.APK_SIZE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| APK Name | ${APK_NAME:-N/A} |" >> $GITHUB_STEP_SUMMARY
+          echo "| APK Size | ${APK_SIZE:-N/A} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build # | ${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📥 Download the APK from the **Artifacts** section below." >> $GITHUB_STEP_SUMMARY
+          echo "📥 Download from **Artifacts** section." >> $GITHUB_STEP_SUMMARY

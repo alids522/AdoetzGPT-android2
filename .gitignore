@@ -5,7 +5,7 @@ npm-debug.log*
 
 # Frontend build output
 frontend/build/
-frontend/dist/
+frontend/.svelte-kit/
 
 # Android
 android/.gradle/
@@ -13,11 +13,9 @@ android/local.properties
 android/app/build/
 android/build/
 android/captures/
-android/.externalNativeBuild/
 android/.cxx/
 *.apk
 *.aab
-*.keystore
 
 # Keystore / secrets
 keystore.jks
@@ -27,6 +25,7 @@ keystore.properties
 .DS_Store
 **/.DS_Store
 ._*
+**/._*
 
 # IDE
 .idea/
@@ -40,3 +39,7 @@ keystore.properties
 # Environment
 .env
 .env.local
+
+# package-lock (generated on install)
+# Keep this un-ignored if you want reproducible builds:
+# package-lock.json
