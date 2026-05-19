@@ -112,10 +112,9 @@ class MainActivity : AppCompatActivity() {
                 userAgentString = "$userAgentString AdoetzGPTFlash/1.0 Android"
             }
 
-            CookieManager.getInstance().apply {
-                setAcceptCookie(true)
-                setAcceptThirdPartyCookies(this@apply, true)
-            }
+            val cookieManager = CookieManager.getInstance()
+            cookieManager.setAcceptCookie(true)
+            cookieManager.setAcceptThirdPartyCookies(this, true)
 
             webViewClient = FlashWebViewClient(this@MainActivity)
             webChromeClient = FlashWebChromeClient()
