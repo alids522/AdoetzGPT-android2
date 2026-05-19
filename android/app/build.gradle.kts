@@ -100,9 +100,6 @@ dependencies {
     // DataStore for persistent storage
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Capacitor
-    implementation("com.capacitorjs:core:6.2.0")
-
     // OkHttp (for connectivity checks)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

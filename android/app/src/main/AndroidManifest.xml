@@ -69,16 +69,12 @@
             android:foregroundServiceType="microphone"
             android:stopWithTask="false" />
 
-        <!-- ── Capacitor provider ── -->
+        <!-- Disable App Startup auto-initialization (DataStore is initialized manually) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             android:exported="false"
-            tools:replace="android:authorities">
-            <meta-data
-                android:name="androidx.datastore.DataStoreInitializer"
-                android:value="androidx.startup" />
-        </provider>
+            tools:node="remove" />
 
     </application>
 
