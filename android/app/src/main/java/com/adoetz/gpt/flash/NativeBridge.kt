@@ -37,7 +37,7 @@ class NativeBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun getSavedBackendUrl(): String {
         // Synchronous read from shared preferences
-        return android.preference.PreferenceManager
+        return androidx.preference.PreferenceManager
             .getDefaultSharedPreferences(context)
             .getString("backend_url", "") ?: ""
     }

@@ -100,6 +100,9 @@ dependencies {
     // DataStore for persistent storage
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Preferences (for sync access in NativeBridge)
+    implementation("androidx.preference:preference-ktx:1.2.1")
+
     // OkHttp (for connectivity checks)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

@@ -11,27 +11,25 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.webkit.WebViewAssetLoader
 import com.adoetz.gpt.flash.service.VoiceSessionService
 import com.adoetz.gpt.flash.utils.BackendPreferences
 import com.adoetz.gpt.flash.databinding.ActivityMainBinding
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * MainActivity — hosts the Capacitor WebView.
+ * MainActivity — hosts the WebView for AdoetzGPT Flash.
  *
  * Flow:
- *   1. On first launch: shows backend setup screen (index.html handles this via localStorage).
- *   2. After setup: WebView redirects to the Open WebUI backend URL.
- *   3. On subsequent launches: directly loads the backend URL.
- *
- * The setup screen runs inside the bundled assets (frontend/build/index.html).
- * After the user enters and confirms a URL, JavaScript calls window.location.href
- * which the WebViewClient intercepts — if it's an external URL, we navigate there.
- * The WebView then loads the full Open WebUI frontend from the remote server.
+ *   1. On first launch: loads the bundled SvelteKit frontend from Android assets
+ *      via WebViewAssetLoader (served as https://appassets.androidplatform.net/).
+ *   2. The frontend checks localStorage for a backend URL:
+ *      - If not set: shows /setup route for backend URL configuration.
+ *      - If set: loads the main Open WebUI interface, with API calls going to the
+ *        remote backend URL (set in constants.ts via localStorage).
+ *   3. All API calls from the frontend go to the remote backend URL.
+ *   4. Static assets (JS, CSS, images) are served locally from the bundled build.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -52,7 +50,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Enable edge-to-edge display with proper insets handling
+        // Enable edge-to-edge display
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -62,7 +60,6 @@ class MainActivity : AppCompatActivity() {
 
         requestPermissions()
         setupWebView(savedInstanceState)
-        bindVoiceService()
     }
 
     // ─────────────────────────────────────────
@@ -92,6 +89,13 @@ class MainActivity : AppCompatActivity() {
     private fun setupWebView(savedInstanceState: Bundle?) {
         webView = binding.webView
 
+        // Create WebViewAssetLoader to serve bundled files from a proper HTTPS origin.
+        // This maps https://appassets.androidplatform.net/ → assets/public/
+        // Solves: absolute paths, CORS, fetch/XHR, WebSocket from file:// issues.
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
         webView?.apply {
             settings.apply {
                 javaScriptEnabled = true
@@ -116,7 +120,7 @@ class MainActivity : AppCompatActivity() {
             cookieManager.setAcceptCookie(true)
             cookieManager.setAcceptThirdPartyCookies(this, true)
 
-            webViewClient = FlashWebViewClient(this@MainActivity)
+            webViewClient = FlashWebViewClient(this@MainActivity, assetLoader)
             webChromeClient = FlashWebChromeClient()
 
             // Bridge JavaScript interface for native calls
@@ -135,7 +139,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Load the bundled setup/loader page
+            // Load the bundled frontend via WebViewAssetLoader (HTTPS origin)
+            // This maps to assets/public/index.html
             loadUrl(BUNDLED_URL)
         }
     }
@@ -174,6 +179,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (webView?.canGoBack() == true) {
             webView?.goBack()
@@ -186,33 +192,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         webView?.destroy()
         webView = null
-        unbindVoiceService()
-    }
-
-    // ─────────────────────────────────────────
-    // VoiceSession Service Binding
-    // ─────────────────────────────────────────
-
-    private var voiceServiceBound = false
-    private val voiceServiceConnection = object : android.content.ServiceConnection {
-        override fun onServiceConnected(name: android.content.ComponentName?, binder: android.os.IBinder?) {
-            voiceServiceBound = true
-        }
-        override fun onServiceDisconnected(name: android.content.ComponentName?) {
-            voiceServiceBound = false
-        }
-    }
-
-    private fun bindVoiceService() {
-        val intent = Intent(this, VoiceSessionService::class.java)
-        bindService(intent, voiceServiceConnection, BIND_AUTO_CREATE)
-    }
-
-    private fun unbindVoiceService() {
-        if (voiceServiceBound) {
-            unbindService(voiceServiceConnection)
-            voiceServiceBound = false
-        }
     }
 
     // ─────────────────────────────────────────
@@ -235,8 +214,9 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val KEY_WEBVIEW_STATE = "webview_state"
-        // Capacitor serves bundled assets from this URL in release.
-        // In CI, the frontend/build is copied to android/app/src/main/assets/public.
-        const val BUNDLED_URL = "file:///android_asset/public/index.html"
+        // WebViewAssetLoader serves assets from:
+        //   https://appassets.androidplatform.net/public/index.html
+        // The path maps to: android/app/src/main/assets/public/index.html
+        const val BUNDLED_URL = "https://appassets.androidplatform.net/public/index.html"
     }
 }
